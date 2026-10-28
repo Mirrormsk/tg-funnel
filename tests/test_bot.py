@@ -61,7 +61,7 @@ async def test_start_after_registration(db: Database, cfg: FunnelConfig) -> None
     assert replies(msg)[-1] == cfg.messages.already_registered
 
 
-@pytest.mark.parametrize(("admins", "answered"), [(frozenset(), True), ({1}, True), ({2}, False)])
+@pytest.mark.parametrize(("admins", "answered"), [(frozenset(), False), ({1}, True), ({2}, False)])
 async def test_stats_command_access(admins: frozenset[int], answered: bool) -> None:
     settings = Settings(bot_token="1:x", webapp_url="https://demo.example", admin_ids=frozenset(admins))
     msg = make_message()

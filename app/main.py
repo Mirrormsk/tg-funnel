@@ -33,6 +33,9 @@ async def run(settings: Settings) -> None:
         ]
     )
 
+    if not settings.admin_ids:
+        log.warning("ADMIN_IDS пуст — дашборд и /stats недоступны никому")
+
     app = create_app(db, cfg, settings)
     server = uvicorn.Server(uvicorn.Config(app, host=settings.host, port=settings.port))
     me = await bot.get_me()

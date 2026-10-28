@@ -26,6 +26,16 @@ jobs:
       - name: Tests
         run: uv run pytest
 
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t tg-funnel:ci .
+      - name: Smoke test
+        # Без токена приложение должно остановиться с понятной ошибкой конфигурации
+        run: docker run --rm tg-funnel:ci 2>&1 | grep -q "Ошибка конфигурации"
+
   secrets:
     runs-on: ubuntu-latest
     steps:

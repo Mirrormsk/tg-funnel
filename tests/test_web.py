@@ -59,6 +59,12 @@ def test_stats_rejects_bad_init_data(client: TestClient, init_data: str) -> None
     assert client.get("/api/stats", headers={"Authorization": f"tma {init_data}"}).status_code == 403
 
 
+def test_empty_admin_list_denies_everyone(db: Database, cfg: FunnelConfig) -> None:
+    client = TestClient(create_app(db, cfg, Settings(bot_token=TOKEN)))
+    r = client.get("/api/stats", headers={"Authorization": f"tma {sign_init_data(42)}"})
+    assert r.status_code == 403
+
+
 def test_dev_mode_skips_auth(db: Database, cfg: FunnelConfig) -> None:
     settings = Settings(bot_token=TOKEN, dev_mode=True)
     assert TestClient(create_app(db, cfg, settings)).get("/api/stats").status_code == 200

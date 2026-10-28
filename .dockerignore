@@ -1,0 +1,17 @@
+# Секреты и локальные данные не должны попадать в образ
+.env
+.env.*
+!.env.example
+data/
+
+.git/
+.github/
+.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.DS_Store
+tests/

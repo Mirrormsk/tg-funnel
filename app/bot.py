@@ -66,7 +66,7 @@ async def on_contact(message: Message, cfg: FunnelConfig, db: Database) -> None:
 @router.message(Command("stats"))
 async def on_stats(message: Message, settings: Settings) -> None:
     user = message.from_user
-    if user is None or (settings.admin_ids and user.id not in settings.admin_ids):
+    if user is None or user.id not in settings.admin_ids:
         return
     if settings.webapp_url is None:
         await message.answer("WEBAPP_URL не задан в .env — дашборду нужен HTTPS-адрес.")

@@ -22,6 +22,7 @@ def validate_init_data(
 
     if (now or time.time()) - data.auth_date.timestamp() > max_age:
         raise AuthError("initData устарели — откройте дашборд заново")
-    if admin_ids and (data.user is None or data.user.id not in admin_ids):
+    # Пустой список админов — доступ закрыт всем (fail-closed); открытый режим только через DEV_MODE
+    if data.user is None or data.user.id not in admin_ids:
         raise AuthError("Нет доступа к дашборду")
     return data
