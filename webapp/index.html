@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Дашборд воронки</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    /* Цвета берём из темы Telegram, фолбэк — для открытия в браузере */
+    :root {
+      --bg: var(--tg-theme-secondary-bg-color, #f1f2f6);
+      --card: var(--tg-theme-bg-color, #ffffff);
+      --text: var(--tg-theme-text-color, #16181d);
+      --muted: var(--tg-theme-hint-color, #8a8f98);
+      --accent: var(--tg-theme-button-color, #2f80ed);
+      --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+      --ok: #2fa66a;
+      --warn: #e0912b;
+      --err: #e5484d;
+      --line: color-mix(in srgb, var(--muted) 22%, transparent);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not(.tg) { --bg: #0f1115; --card: #181b21; --text: #eef0f3; --muted: #8b919c; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 16px 16px 32px; background: var(--bg); color: var(--text);
+      font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+    h1 { font-size: 20px; margin: 0; }
+    h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 12px; }
+    .updated { font-size: 12px; color: var(--muted); }
+    .updated::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); margin-right: 6px; vertical-align: 1px; }
+    .card { background: var(--card); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+    .kpis { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px; }
+    @media (min-width: 640px) { .kpis { grid-template-columns: repeat(4, 1fr); } }
+    .kpi { margin: 0; }
+    .kpi .label { font-size: 13px; color: var(--muted); }
+    .kpi .value { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .kpi .sub { font-size: 12px; color: var(--muted); }
+
+    .step { margin-bottom: 12px; }
+    .step:last-child { margin-bottom: 0; }
+    .step-head { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; gap: 8px; }
+    .step-head b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .step-head span.pct { color: var(--muted); font-weight: 400; margin-left: 6px; }
+    .bar { height: 10px; background: var(--accent-soft); border-radius: 5px; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: var(--accent); border-radius: 5px; transition: width .5s ease; }
+
+    .chart { display: flex; align-items: flex-end; gap: 4px; height: 120px; }
+    .col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 2px; position: relative; }
+    .col .s, .col .p { width: 100%; border-radius: 3px 3px 0 0; min-height: 0; transition: height .5s ease; }
+    .col .s { background: var(--accent-soft); position: absolute; bottom: 0; }
+    .col .p { background: var(--accent); position: absolute; bottom: 0; width: 60%; }
+    .axis { display: flex; gap: 4px; margin-top: 6px; }
+    .axis span { flex: 1; text-align: center; font-size: 10px; color: var(--muted); }
+    .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 10px; }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+
+    .queue { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { padding: 6px 10px; border-radius: 999px; font-size: 13px; background: var(--bg); }
+    .pill b { font-variant-numeric: tabular-nums; }
+    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    td { padding: 9px 0; border-top: 1px solid var(--line); vertical-align: top; }
+    tr:first-child td { border-top: 0; }
+    td.r { text-align: right; white-space: nowrap; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+    .tag.ok { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+    .tag.wait { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+    .tag.none { background: var(--bg); color: var(--muted); }
+
+    .state { text-align: center; padding: 48px 16px; color: var(--muted); }
+    .state b { display: block; color: var(--text); font-size: 17px; margin-bottom: 6px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Воронка регистраций</h1>
+    <span class="updated" id="updated" hidden></span>
+  </header>
+
+  <div class="state" id="state"><b>Загрузка…</b></div>
+
+  <main id="app" hidden>
+    <section class="kpis">
+      <div class="card kpi"><div class="label">Запустили бота</div><div class="value" id="k-started">0</div><div class="sub">всего</div></div>
+      <div class="card kpi"><div class="label">Оставили телефон</div><div class="value" id="k-phone">0</div><div class="sub">всего</div></div>
+      <div class="card kpi"><div class="label">Конверсия</div><div class="value" id="k-conv">0%</div><div class="sub">старт → телефон</div></div>
+      <div class="card kpi"><div class="label">Сегодня</div><div class="value" id="k-today">0</div><div class="sub" id="k-today-sub">новых</div></div>
+    </section>
+
+    <section class="card">
+      <h2>Воронка</h2>
+      <div id="funnel"></div>
+    </section>
+
+    <section class="card">
+      <h2>По дням, 14 дней</h2>
+      <div class="chart" id="chart"></div>
+      <div class="axis" id="axis"></div>
+      <div class="legend">
+        <span><i style="background:var(--accent-soft)"></i>старт</span>
+        <span><i style="background:var(--accent)"></i>телефон</span>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Отложенные сообщения</h2>
+      <div class="queue" id="queue"></div>
+    </section>
+
+    <section class="card">
+      <h2>Последние пользователи</h2>
+      <table><tbody id="recent"></tbody></table>
+    </section>
+  </main>
+
+<script>
+  const tg = window.Telegram?.WebApp;
+  const inTelegram = Boolean(tg?.initData);
+  if (inTelegram) {
+    document.documentElement.classList.add("tg");
+    tg.ready();
+    tg.expand();
+  }
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  let tz = "Europe/Moscow";
+  const fmtTime = (ts) => new Date(ts * 1000).toLocaleString("ru-RU", { timeZone: tz, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  function render(d) {
+    tz = d.timezone;
+    const t = d.totals;
+    $("k-started").textContent = t.started;
+    $("k-phone").textContent = t.phone;
+    $("k-conv").textContent = `${t.conversion}%`;
+    const today = d.daily[d.daily.length - 1];
+    $("k-today").textContent = today.started;
+    $("k-today-sub").textContent = `новых, ${today.phone} с телефоном`;
+
+    const top = d.funnel[0].count;
+    $("funnel").innerHTML = d.funnel.map((s, i) => {
+      const prev = i ? d.funnel[i - 1].count : null;
+      const step = i ? `${pct(s.count, prev)}% от пред.` : "";
+      return `<div class="step">
+        <div class="step-head"><span>${esc(s.label)}</span><b>${s.count}<span class="pct">${step}</span></b></div>
+        <div class="bar"><i style="width:${pct(s.count, top)}%"></i></div>
+      </div>`;
+    }).join("");
+
+    const max = Math.max(1, ...d.daily.map((x) => x.started));
+    $("chart").innerHTML = d.daily.map((x) =>
+      `<div class="col" title="${x.day}: старт ${x.started}, телефон ${x.phone}">
+        <div class="s" style="height:${(x.started / max) * 100}%"></div>
+        <div class="p" style="height:${(x.phone / max) * 100}%"></div>
+      </div>`).join("");
+    $("axis").innerHTML = d.daily.map((x, i) =>
+      `<span>${i % 2 === d.daily.length % 2 ? "" : x.day.slice(8)}</span>`).join("");
+
+    const q = d.queue;
+    $("queue").innerHTML = [
+      ["В очереди", q.pending, "var(--warn)"],
+      ["Отправлено", q.sent, "var(--ok)"],
+      ["Ошибки", q.failed, "var(--err)"],
+    ].map(([l, n, c]) => `<span class="pill"><span class="dot" style="background:${c}"></span>${l}: <b>${n}</b></span>`).join("");
+
+    $("recent").innerHTML = d.recent.length ? d.recent.map((u) => {
+      let tag;
+      if (!u.phone) tag = `<span class="tag none">без телефона</span>`;
+      else if (u.messages_sent < u.messages_total) tag = `<span class="tag wait">цепочка ${u.messages_sent}/${u.messages_total}</span>`;
+      else tag = `<span class="tag ok">цепочка ${u.messages_sent}/${u.messages_total}</span>`;
+      return `<tr>
+        <td>${esc(u.name || "—")} ${u.username ? `<span class="muted">@${esc(u.username)}</span>` : ""}
+          <div class="muted">${u.phone ? esc(u.phone) : "&nbsp;"}</div></td>
+        <td class="r">${tag}<div class="muted">${fmtTime(u.started_at)}</div></td>
+      </tr>`;
+    }).join("") : `<tr><td class="muted">Пока никто не запускал бота</td></tr>`;
+
+    $("updated").hidden = false;
+    $("updated").textContent = `обновлено ${new Date().toLocaleTimeString("ru-RU")}`;
+    $("state").hidden = true;
+    $("app").hidden = false;
+  }
+
+  function showError(title, text) {
+    $("app").hidden = true;
+    $("state").hidden = false;
+    $("state").innerHTML = `<b>${esc(title)}</b>${esc(text)}`;
+  }
+
+  async function load() {
+    try {
+      const res = await fetch("api/stats", { headers: inTelegram ? { Authorization: `tma ${tg.initData}` } : {} });
+      if (res.status === 401 || res.status === 403) {
+        const body = await res.json().catch(() => ({}));
+        return showError("Нет доступа", body.detail || "Откройте дашборд из Telegram");
+      }
+      if (!res.ok) throw new Error(res.status);
+      render(await res.json());
+    } catch (e) {
+      // Не затираем уже показанные данные из-за разового сбоя сети
+      if ($("app").hidden) showError("Не удалось загрузить данные", "Проверьте, что бот запущен");
+    }
+  }
+
+  load();
+  setInterval(load, 3000);  // живое обновление: видно, как уходят сообщения по расписанию
+</script>
+</body>
+</html>
